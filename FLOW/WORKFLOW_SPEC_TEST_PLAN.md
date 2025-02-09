@@ -1,7 +1,7 @@
 # 仕様化テスト計画ワークフロー
 
 ## 概要
-このワークフローは、依存性分析の結果を基に、既存の動作を保証するための仕様化テストの計画を立案します。特に、セキュリティクリティカルなコンポーネントや複雑な依存関係を持つ部分に注目し、効果的なテスト計画を作成します。
+このワークフローは、依存性分析の結果を基に、既存の動作を保証するための仕様化テストの計画を立案します。観点を先に設計し、その観点に基づいて実際の動作を記録します。実装フェーズでは、実装計画書による全体方針と、動作記録による具体的なテストケースの両方を活用します。
 
 ## ワークフロー全体図
 ```mermaid
@@ -16,26 +16,18 @@ graph TD
     Input[dependency_analysis.yaml]:::file
     
     Start[開始] --> Input
-    Input --> Phase1[観察対象特定]:::process
-    Phase1 --> Review1[人間レビュー: 観察対象の妥当性]:::review
-    Review1 --> Phase2[動作記録]:::process
+    Input --> Phase1[観点設計]:::process
+    Phase1 --> Review1[人間レビュー: 観点の妥当性]:::review
+    Review1 --> OD[observation_design.yaml]:::file
+    OD --> Phase2[動作記録]:::process
     Phase2 --> Review2[人間レビュー: 記録内容の確認]:::review
-    Review2 --> Phase3[再現方法設計]:::process
-    Phase3 --> Review3[人間レビュー: テストケース設計]:::review
-    Review3 --> TD[test_design.yaml]:::file
-    Review3 --> RB[recorded_behaviors.yaml]:::file
+    Review2 --> RB[recorded_behaviors.yaml]:::output
+    Phase2 --> Phase3[実装計画策定]:::process
+    Phase3 --> Review3[人間レビュー: 実装計画の確認]:::review
+    Review3 --> IP[spec_test_implementation_plan.yaml]:::output
     
-    TD --> Phase4[最終出力生成]:::process
-    RB --> Phase4
-    Input --> Phase4
-    
-    Error[エラーハンドリング]:::error
-    Phase1 --> Error
-    Phase2 --> Error
-    Phase3 --> Error
-    Phase4 --> Error
-    
-    Phase4 --> IP[spec_test_implementation_plan.yaml]:::output
+    RB --> Implementation[テスト実装フェーズ]:::output
+    IP --> Implementation
 ```
 
 ## フェーズ間の依存関係
@@ -47,392 +39,248 @@ graph TD
     classDef file fill:#0277bd,stroke:#b3e5fc,color:#fff
 
     Input[dependency_analysis.yaml]:::file
-    Targets[観察対象リスト]:::memory
-    Behaviors[動作記録]:::memory
-    TestDesign[テストケース設計]:::memory
-    TD[test_design.yaml]:::file
+    OD[observation_design.yaml]:::file
     RB[recorded_behaviors.yaml]:::file
     IP[spec_test_implementation_plan.yaml]:::file
 
-    Input --> Phase1[観察対象特定]:::phase
-    Phase1 --> Targets
-    Targets --> Phase2[動作記録]:::phase
-    Phase2 --> Behaviors
-    Behaviors --> Phase3[再現方法設計]:::phase
-    Phase3 --> TestDesign
-    TestDesign --> TD
-    Phase3 --> RB
+    Input --> Phase1[観点設計]:::phase
+    Phase1 --> OD
+    OD --> Phase2[動作記録]:::phase
+    Phase2 --> RB
+    Input --> Phase3[実装計画策定]:::phase
+    RB --> Phase3
+    Phase3 --> IP
     
-    Input --> Phase4[最終出力生成]:::phase
-    TD --> Phase4
-    RB --> Phase4
-    Phase4 --> IP
+    RB --> Implementation[テスト実装フェーズ]:::phase
+    IP --> Implementation
 ```
 
-## 1. 観察対象特定フェーズ
+## 1. 観点設計フェーズ
 
 ### 概要
-依存性分析の結果から、優先的に観察すべき対象を特定します。
+依存性分析の結果から、どのような観点で動作を観察すべきかを設計します。この段階では期待値は設定せず、「何を」「どのような状況で」観察するかを定義します。
 
 ### 入力
 - `FLOW/output/dependency_analysis.yaml`
 
-### 処理内容
-1. セキュリティクリティカルなコンポーネントの特定
-2. 複雑な依存関係を持つコンポーネントの特定
-3. 循環参照を含むコンポーネントの特定
-4. 観察優先度の決定
-
 ### 出力
-- `FLOW/temp/observation_targets.yaml`
+- `FLOW/temp/observation_design.yaml`
+
+### 出力ファイル形式
 ```yaml
-targets:
+observation_points:
   - component: "AuthController::login"
     priority: "high"
     reason: "security_score: 0.9"
-    observation_points:
-      - point: "認証処理入口"
-        capture: "認証リクエストの内容"
-      - point: "認証サービス呼び出し"
-        capture: "認証パラメータ"
-      - point: "セッション生成"
-        capture: "セッション状態"
+    aspects:
+      - aspect: "認証フロー"
+        situations:
+          - "正しい認証情報での実行"
+          - "誤った認証情報での実行"
+          - "無効なトークンでの実行"
+        capture_points:
+          - "認証前の状態"
+          - "認証処理中の各ステップ"
+          - "認証後の状態変化"
+
+      - aspect: "セッション管理"
+        situations:
+          - "新規セッション生成時"
+          - "既存セッション更新時"
+        capture_points:
+          - "セッションデータの変化"
+          - "トークンの生成状態"
 
   - component: "TodoController::store"
     priority: "high"
-    reason: "complexity_score: 0.8, circular_dependency"
-    observation_points:
-      - point: "Todo-Tag相互作用"
-        capture: "関連付け状態の変化"
+    reason: "complexity_score: 0.8"
+    aspects:
+      - aspect: "データ整合性"
+        situations:
+          - "単純なTodo作成"
+          - "タグ付きTodo作成"
+          - "無効なタグ指定"
+        capture_points:
+          - "DBの状態変化"
+          - "関連テーブルの整合性"
 ```
 
 ## 2. 動作記録フェーズ
 
 ### 概要
-observation_targets.yamlから観察対象の情報を読み取り、curlコマンドを生成・実行して、実際の動作をTelescopeで記録します。
+設計された観点に基づいて、実際の動作を記録します。Cursorのエージェントモードでサーバを起動し、人間の操作による動作確認と記録を行います。この段階では「こう動くべき」という判断は行わず、純粋に「こう動く」という事実を記録します。
+
+### 手順
+1. **環境準備**
+   ```bash
+   # Cursorエージェントがサーバを起動
+   php artisan serve
+   ```
+
+2. **操作指示**
+   - エージェントは`observation_design.yaml`の各`situations`に基づいて、
+     人間に対して具体的な操作手順を指示します
+   ```yaml
+   # 操作指示例
+   instruction:
+     situation: "タグ付きTodo作成"
+     steps:
+       1: "ログインページにアクセス: GET /login"
+       2: "テストユーザーでログイン"
+       3: "Todo作成ページにアクセス: GET /todos/create"
+       4: "フォームに以下の値を入力:"
+          - "タイトル: テストTodo"
+          - "説明: テスト説明"
+          - "タグ: 既存のタグを選択"
+       5: "作成ボタンをクリック: POST /todos"
+   ```
+
+3. **動作記録**
+   - エージェントは指示された操作の実行結果を記録
+   - サーバログ、データベースの変更、レスポンス内容を収集
+   - 記録された情報は構造化されたYAMLとして保存
 
 ### 入力
-- `FLOW/temp/observation_targets.yaml`
+- `FLOW/temp/observation_design.yaml`
 
 ### 出力
-- `FLOW/temp/recorded_behaviors.yaml`：構造化された動作記録
+- `FLOW/output/recorded_behaviors.yaml`
 
-### エージェントの実行手順
-
-1. **環境準備**
-```bash
-# Telescopeの記録をクリア
-php artisan telescope:clear
-
-# 開発サーバーが起動していることを確認
-curl http://localhost:8000/health
-# エラーハンドリング：サーバー起動確認
-if [ $? -ne 0 ]; then
-    echo "開発サーバーが起動していません"
-    exit 1
-fi
-```
-
-2. **観察対象ごとの実行**
-```bash
-# 認証が必要な場合はログイン
-TOKEN=$(curl -X POST http://localhost:8000/api/login \
-     -H "Content-Type: application/json" \
-     -d '{"email": "test@example.com", "password": "password123"}' \
-     | jq -r '.token')
-
-# エラーハンドリング：認証
-if [ $? -ne 0 ]; then
-    echo "認証に失敗しました"
-    exit 1
-fi
-
-# TodoController::storeの実行例
-response=$(curl -w "\n%{http_code}" -X POST http://localhost:8000/api/todos \
-     -H "Content-Type: application/json" \
-     -H "Authorization: Bearer ${TOKEN}" \
-     -d '{"title": "買い物", "description": "牛乳を買う", "tags": [1]}')
-
-status=$(echo "$response" | tail -n1)
-body=$(echo "$response" | sed '$d')
-
-# エラーハンドリング：APIレスポンス
-case $status in
-    401)
-        echo "認証エラー：トークンが無効です"
-        exit 1
-        ;;
-    422)
-        echo "バリデーションエラー：$body"
-        # バリデーションエラーは記録対象なので終了しない
-        ;;
-    500)
-        echo "サーバーエラー：$body"
-        exit 1
-        ;;
-esac
-
-# 記録の保存（Telescopeから自動的に記録される）
-```
-
-3. **記録の構造化（Telescopeから取得）**
-```bash
-# 直近の記録を取得
-php artisan telescope:export --latest > FLOW/temp/telescope_raw.json
-```
-
-4. **動作記録の構造化**
-エージェントは`telescope_raw.json`を解析し、以下の手順で`recorded_behaviors.yaml`を生成します：
-
-1. 重要な振る舞いの抽出
-   - リクエスト/レスポンスの流れから基本フローを特定
-   - SQLクエリから重要なデータ操作を特定
-   - イベントから副作用や状態変化を特定
-
-2. 依存関係の分析
-   - 認証要件の確認
-   - 必要なデータの事前条件を特定
-   - 外部サービスへの依存を確認
-
-3. エラーパターンの収集
-   - バリデーションエラーの条件
-   - 認証/認可エラーの条件
-   - その他のビジネスルールによるエラー
-
-### 出力形式
+### 出力ファイル形式
 ```yaml
-# FLOW/temp/recorded_behaviors.yaml
 recorded_behaviors:
   - component: "TodoController::store"
-    purpose: "Todo新規作成（タグ付き）の基本フロー"
-    key_behaviors:
-      - step: "認可チェック"
-        observed:
-          - "ユーザーのTodo作成権限を確認"
-          - "リクエストユーザーとトークンの整合性確認"
-      
-      - step: "入力値バリデーション"
-        observed:
-          - "titleは必須で255文字以内"
-          - "descriptionは1000文字以内"
-          - "tagsは存在するtagのidのみ許可"
-      
-      - step: "Todo作成"
-        observed:
-          - "ユーザーIDと紐付けて保存"
-          - "作成日時は自動設定"
-      
-      - step: "タグ関連付け"
-        observed:
-          - "指定されたタグを関連付け"
-          - "中間テーブルにレコード作成"
-      
-      - step: "レスポンス生成"
-        observed:
-          - "作成されたTodoの情報を返却"
-          - "関連付けられたタグ情報も含める"
-
-    dependencies:
-      - type: "認証"
-        required: true
-        details: "有効なBearerトークンが必要"
-      
-      - type: "データ"
-        required: true
-        details: "関連付け対象のタグが存在している必要あり"
-
-    error_patterns:
-      - condition: "未認証"
-        observed: "401 Unauthorizedを返却"
-      
-      - condition: "バリデーションエラー"
-        observed: "422 Unprocessable Entityで詳細を返却"
-      
-      - condition: "存在しないタグID指定"
-        observed: "422 Unprocessable Entityでタグの存在チェックエラーを返却"
-
-meta:
-  recorded_at: "2024-03-20 10:00:00"
-  environment: "local"
+    aspect: "データ整合性"
+    situation: "タグ付きTodo作成"
+    observed_flow:
+      - step: "リクエスト受付"
+        actual_behavior: "POST /api/todos"
+        request_data:
+          title: "テストTodo"
+          description: "テスト説明"
+          tags: [1, 2]
+        
+      - step: "認可確認"
+        actual_behavior: "Gate::allows('create-todo')を実行"
+        auth_status: "認証済みユーザー"
+        
+      - step: "データ検証"
+        actual_behavior: "title, description, tagsの存在確認"
+        validation_rules:
+          title: "required|string|max:255"
+          description: "required|string"
+          tags: "array|exists:tags,id"
+        
+      - step: "DB操作"
+        actual_behavior:
+          - "todosテーブルに1レコード追加"
+          - "todo_tagテーブルに関連レコード追加"
+        db_changes:
+          todos:
+            - id: 1
+              title: "テストTodo"
+              description: "テスト説明"
+          todo_tag:
+            - todo_id: 1
+              tag_id: 1
+            - todo_id: 1
+              tag_id: 2
 ```
 
-### 人間の役割
-1. 記録された動作の妥当性確認
-   - 期待通りのフローが実行されているか
-   - 重要な処理が漏れていないか
-   - エラーケースの確認
+### エージェントの役割
+1. **操作シナリオの生成**
+   - `observation_design.yaml`から具体的な操作手順を生成
+   - 人間が実行可能な形式での指示を提供
 
-2. 必要に応じて追加の観察ポイントを提案
-   - 見落としている動作がないか
-   - 追加で確認すべきエラーケースはないか
+2. **動作の記録**
+   - サーバログの収集
+   - データベースの状態変化の記録
+   - リクエスト/レスポンスの詳細な記録
 
-## 3. 再現方法設計フェーズ
+3. **記録のフォーマット化**
+   - 収集した情報を構造化されたYAML形式に変換
+   - テスト実装時に参照しやすい形式での保存
+
+## 3. 実装計画策定フェーズ
 
 ### 概要
-記録された動作を再現可能なテストケースとして設計します。既存の動作を保証するための仕様化テストが目的です。
+テスト実装の全体方針を策定します。テストの優先順位、カバレッジ要件、テストデータの準備方針などを定義します。
 
 ### 入力
-- `FLOW/temp/recorded_behaviors.yaml`：記録された動作
-- `FLOW/output/dependency_analysis.yaml`：依存関係の参照用（テストの前提条件の把握）
-
-### エージェントの実行手順
-
-1. **記録された動作の分析**
-- key_behaviorsから検証すべき動作を特定
-- 各ステップの入力と期待される結果を整理
-- error_patternsから異常系の検証ポイントを特定
-
-2. **テストケースの設計**
-```yaml
-# FLOW/temp/test_design.yaml
-test_cases:
-  TodoController::store:
-    # 正常系：基本フロー
-    basic_flow:
-      title: "Todo作成の基本フロー"
-      context: "認証済みユーザーが有効なデータでTodoを作成"
-      steps:
-        - description: "Todoを作成"
-          input:
-            title: "買い物"
-            description: "牛乳を買う"
-            tags: [1]
-          expected:
-            status: 201
-            data:
-              - "作成されたTodoが返却される"
-              - "指定したタグが関連付けられている"
-            database:
-              - "todosテーブルにレコードが作成される"
-              - "todo_tagsテーブルに関連が作成される"
-
-    # 異常系：記録されたエラーパターン
-    error_cases:
-      - title: "バリデーションエラー"
-        context: "必須項目が未入力"
-        steps:
-          - description: "タイトルなしでTodoを作成"
-            input:
-              description: "牛乳を買う"
-            expected:
-              status: 422
-              errors:
-                - "titleは必須項目です"
-
-      - title: "存在しないタグ指定"
-        context: "存在しないタグIDを指定"
-        steps:
-          - description: "無効なタグIDでTodo作成"
-            input:
-              title: "買い物"
-              tags: [999]
-            expected:
-              status: 422
-              errors:
-                - "指定されたタグは存在しません"
-
-    # 検証すべき仕様のまとめ
-    specifications:
-      - "認証済みユーザーのみTodoを作成できる"
-      - "タイトルは必須で255文字以内"
-      - "タグは存在するものだけ指定可能"
-      - "作成したTodoは即座にDBに保存される"
-```
+- `FLOW/output/dependency_analysis.yaml`
+- `FLOW/output/recorded_behaviors.yaml`
 
 ### 出力
-- `FLOW/temp/test_design.yaml`：テストケース設計書
+- `FLOW/output/spec_test_implementation_plan.yaml`
 
-### 人間の役割
-1. テストケース設計の妥当性確認
-   - 記録された動作が正しくテストケースに変換されているか
-   - 重要な検証ポイントが漏れていないか
-   - 異常系の網羅性は十分か
-
-2. 追加のテストケース提案
-   - 記録からは読み取れない重要なエッジケース
-   - ビジネス上重要な検証ポイント
-
-## 4. 最終出力生成フェーズ
-
-### 概要
-仕様化テスト実装ワークフローで使用するために、これまでの分析結果を統合します。
-
-### 入力
-- `FLOW/temp/test_design.yaml`：テストケース設計
-- `FLOW/temp/recorded_behaviors.yaml`：記録された動作
-- `FLOW/output/dependency_analysis.yaml`：依存関係情報
-
-### エージェントの実行手順
-1. **テスト実装に必要な情報の統合**
+### 出力ファイル形式
 ```yaml
-# FLOW/output/spec_test_implementation_plan.yaml
 implementation_plan:
-  # テスト対象コンポーネント情報
-  target:
-    component: "TodoController::store"
-    file_path: "app/Http/Controllers/TodoController.php"
-    method: "store"
-    
-  # テストの前提条件
-  prerequisites:
-    database:
-      - model: "User"
-        state: "認証済みユーザー"
-      - model: "Tag"
-        state: "既存のタグ"
-    
-  # テストケース定義
-  test_cases:
-    # test_design.yamlから変換
-    basic_flow:
-      title: "Todo作成の基本フロー"
-      context: "認証済みユーザーが有効なデータでTodoを作成"
-      steps: [...]
-    error_cases: [...]
-    
-  # 検証すべき仕様
-  specifications:
-    - "認証済みユーザーのみTodoを作成できる"
-    - "タイトルは必須で255文字以内"
-    [...]
-    
-  # 実際の動作記録（参照用）
-  recorded_behavior:
-    key_behaviors:
-      - step: "認可チェック"
-        observed: [...]
-    error_patterns: [...]
+  # プロジェクト全体の方針
+  project_info:
+    name: "Todo Application"
+    test_coverage_requirements:
+      overall: 85%
+      security_critical: 100%
+      high_complexity: 90%
+
+  # テストの優先順位
+  priorities:
+    high:
+      - component: "AuthController"
+        reason: "security_score: 0.9"
+        coverage_required: 100%
+      
+      - component: "TodoController"
+        reason: "complexity_score: 0.8"
+        coverage_required: 90%
+
+  # テストデータ準備方針
+  data_requirements:
+    factories:
+      - name: "TodoFactory"
+        fields: ["title", "description", "user_id"]
+      - name: "TagFactory"
+        fields: ["name"]
+
+    seeders:
+      - name: "TestDatabaseSeeder"
+        contents:
+          - "テストユーザーの作成"
+          - "基本タグの作成"
 ```
 
-### 出力
-- `FLOW/output/spec_test_implementation_plan.yaml`：仕様化テスト実装計画
+## テスト実装フェーズへの入力
 
-### 人間の役割
-1. 実装計画の妥当性確認
-   - テストケースが実装可能な形式になっているか
-   - 必要な情報が漏れなく含まれているか
+### 実装計画書の役割
+- テストの全体方針の提供
+- カバレッジ要件の定義
+- テストの優先順位の指定
+- テストデータ準備の方針
+- テストクラスの構成方針
+
+### 動作記録の役割
+- 具体的なテストケースの提供
+- 実際の動作フローの詳細
+- 検証ポイントの特定
+- エラーケースの情報
 
 ## レビューポイント定義
 
-### 観察対象の妥当性（Review1）
-- 依存性分析の結果が適切に反映されているか
-- セキュリティクリティカルな部分が漏れなく含まれているか
-- 複雑な依存関係を持つ部分が適切に特定されているか
+### 観点の妥当性（Review1）
+- 重要な観察ポイントが漏れていないか
+- 観察すべき状況が適切に定義されているか
+- キャプチャポイントは十分か
 
 ### 記録内容の確認（Review2）
-- 重要な動作が漏れなく記録されているか
-- 依存関係の相互作用が適切に記録されているか
-- セキュリティ関連の動作が詳細に記録されているか
+- 設計された観点に基づく記録ができているか
+- 実際の動作が客観的に記録されているか
+- エラーケースの記録は十分か
 
-### 再現方法の実現性（Review3）
-- 提案された再現方法は実現可能か
-- 依存関係の分離戦略は適切か
-- テスト環境の制約は考慮されているか
-
-### 最終計画確認（Review4）
-- 全体的な整合性は取れているか
-- 実装可能な形式になっているか
-- 依存性分析の結果が適切に活用されているか 
+### 実装計画の確認（Review3）
+- テストの優先順位は適切か
+- カバレッジ要件は妥当か
+- テストデータの準備方針は十分か
 
 ## レビュー実施のガイドライン
 1. 各レビューポイントでは「承認」または「差し戻し」を明確に判断
