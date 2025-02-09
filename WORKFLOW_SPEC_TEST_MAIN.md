@@ -1,69 +1,130 @@
-# 仕様化テストメインワークフロー
+# 仕様化テストフェーズ定義
 
-## 概要
-依存性注入リファクタリングの安全性を確保するための仕様化テスト作成ワークフロー
-
-## 前提条件
-- リファクタリング対象のコードが特定されていること
-
-## フェーズ
+## フェーズ概要
 ```mermaid
 graph TD
-    Start[開始]
-    Analyze[依存関係分析]
-    Plan[仕様化テスト計画]
-    Impl[仕様化テスト実装]
-    Exec[仕様化テスト実行]
-    Eval[仕様化テスト評価]
-    End[終了]
+    P1[依存関係分析]
+    P2[仕様化テスト計画]
+    P3[仕様化テスト実装]
+    P4[仕様化テスト実行]
 
-    Start --> Analyze
-    Analyze --> Plan
-    Plan --> Impl
-    Impl --> Exec
-    Exec --> Eval
-    Eval -->|OK| End
-    Eval -->|NG| Plan
+    P1 --> P2
+    P2 --> P3
+    P3 --> P4
 ```
 
 ## 1. 依存関係分析フェーズ
-- 目的：リファクタリング対象コードの依存関係を分析し、テスト戦略を決定する
-- サブワークフロー：WORKFLOW_SPEC_TEST_DI_ANALYZE.md
-- 主な分析項目：
-  - 依存関係グラフの構築
-  - 結合度・凝集度の計算
-  - コード特性の分析
-  - レイヤー分析
-- 出力：
-  - 依存関係分析レポート
-  - リファクタリング候補の提案
-  - テスト要件の初期評価
+**実行ワークフロー**: `WORKFLOW_SPEC_TEST_DI_ANALYZE.md`
+
+### 目的
+- リファクタリング対象コードの依存関係を分析
+- テスト戦略決定のための情報収集
+- 依存関係の構造化と可視化
+
+### 入力
+- 依存関係YAML（`dependency.yaml`）
+
+### 出力
+- 依存関係分析結果（`FLOW/output/dependency_analysis.yaml`）
 
 ## 2. 仕様化テスト計画フェーズ
-- 目的：既存コードの動作を観察・記録し、テスト実装の計画を立てる
-- サブワークフロー：
-  1. 観察計画 (WORKFLOW_OBSERVATION_PLAN_DI.md)
-  2. 動作記録 (WORKFLOW_BEHAVIOR_RECORDING_DI.md)
-  3. テスト環境設計 (WORKFLOW_TEST_ENV_DESIGN_DI.md)
-  4. テスト実装計画 (WORKFLOW_TEST_IMPL_PLAN_DI.md)
+**実行ワークフロー**: `WORKFLOW_SPEC_TEST_PLAN.md`
+
+### 目的
+- 既存コードの動作観察計画の立案
+- 動作記録の実施
+- テスト実装計画の策定
+
+### 入力
+- 依存関係分析結果（`FLOW/output/dependency_analysis.yaml`）
+
+### 出力
+- 動作記録（`FLOW/output/recorded_behaviors.yaml`）
+- テスト実装計画（`FLOW/output/spec_test_implementation_plan.yaml`）
 
 ## 3. 仕様化テスト実装フェーズ
-- 目的：計画に基づいて仕様化テストを実装する
-- 入力：仕様化テスト計画の成果物
-- 出力：仕様化テストコード
+**実行ワークフロー**: `WORKFLOW_SPEC_TEST_IMPL.md`
+
+### 目的
+実装計画と動作記録に基づいて、仕様化テストコードを実装します。
+
+### 入力
+- 動作記録（`FLOW/output/recorded_behaviors.yaml`）
+- テスト実装計画（`FLOW/output/spec_test_implementation_plan.yaml`）
+
+### 処理内容
+1. テスト構造の決定
+   - 実装計画の `implementation_strategy.test_structure` に基づくテストクラスの配置
+   - 優先順位の反映
+
+2. テストケースの実装
+   - 実装計画の `priorities.*.test_cases` に基づくテストメソッドの生成
+   - 動作記録の参照と反映
+
+3. テストコードの生成
+   - 正常系、エラーケース、境界値ケースの実装
+   - テストメソッドの命名規則の適用
+   - コメントとアサーションの整備
+
+### 出力
+- テストコード（`tests/Feature/**/*Test.php`）
+- 実装レポート（`FLOW/output/test_implementation_report.yaml`）
+  - 実装の網羅性
+  - テストケースの追跡可能性
+  - コード品質の検証結果
+  - 実装の進捗状況
 
 ## 4. 仕様化テスト実行フェーズ
-- 目的：実装したテストを実行し、既存の動作を正しく検証できることを確認
-- 入力：仕様化テストコード
-- 出力：テスト実行結果
+**実行ワークフロー**: `WORKFLOW_SPEC_TEST_EXEC.md`
 
-## 5. 仕様化テスト評価フェーズ
-- 目的：仕様化テストが十分な品質であることを確認
-- 評価基準：
-  - 既存の動作を正確に検証できているか
-  - すべての観察対象をカバーしているか
-  - テストの再現性は確保されているか
+### 目的
+- 実装したテストの実行と結果の収集
+- 実装レポートとの整合性確認
+- カバレッジ情報の収集と分析
 
-## 次のフェーズへ
-- すべての評価基準を満たした場合、依存性注入リファクタリングフェーズへ移行
-- 基準を満たさない場合、必要なフェーズに戻って改善
+### 入力
+- テストコード（`tests/Feature/**/*Test.php`）
+- 実装レポート（`FLOW/output/test_implementation_report.yaml`）
+
+### 処理内容
+1. テストの実行
+   - PHPUnitによるテストの実行
+   - テスト結果の収集
+   - コードカバレッジの計測
+
+2. 実装レポートとの整合性確認
+   - テストケースの実行結果と実装計画の照合
+   - 実行順序と優先度の確認
+
+3. 結果の集計とレポート生成
+   - テスト実行結果の構造化
+   - カバレッジ情報の集計
+
+### 出力
+- テスト実行結果（`FLOW/output/test_results.yaml`）
+- カバレッジレポート（`FLOW/output/coverage_report.html`）
+  ```yaml
+  evaluation:
+    coverage_status: "PASS|FAIL"
+    test_quality: "PASS|FAIL"
+    improvements_needed: [...]
+    next_action: "PROCEED|RETRY"
+  ```
+
+## フェーズ間のファイル依存関係
+```mermaid
+graph TD
+    DY[dependency.yaml] --> DA[dependency_analysis.yaml]
+    DA --> OD[observation_design.yaml]
+    DA --> IP[spec_test_implementation_plan.yaml]
+    OD --> RB[recorded_behaviors.yaml]
+    RB --> IP
+    IP --> TC[Test Code]
+    TC --> TR[test_results.yaml]
+```
+
+## 注意事項
+1. 各フェーズは独立したワークフローファイルで管理
+2. フェーズ間の入出力ファイルは厳密に定義
+3. 評価フェーズでNGの場合は計画フェーズに戻る
+4. 全フェーズでレビューポイントを設定 

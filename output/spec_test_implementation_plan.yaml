@@ -1,0 +1,153 @@
+implementation_plan:
+  # プロジェクト全体の方針
+  project_info:
+    name: "Todo Application"
+    test_coverage_requirements:
+      overall: 85%
+      security_critical: 100%
+      high_complexity: 90%
+    performance_sla:
+      auth_flow: 500ms
+      todo_management: 800ms
+
+  # テストの優先順位
+  priorities:
+    high:
+      - component: "AuthController"
+        reason: "security_score: 0.9"
+        coverage_required: 100%
+        test_cases:
+          - name: "正常な認証フロー"
+            observed_behavior: "recorded_behaviors.yaml#AuthController.正常な認証情報での認証"
+            assertions:
+              - "認証成功時のリダイレクト先が /todos"
+              - "セッションにユーザー情報が格納される"
+              - "レスポンスタイムが500ms以内"
+          
+          - name: "無効な認証情報での認証"
+            observed_behavior: "recorded_behaviors.yaml#AuthController.無効な認証情報での認証"
+            assertions:
+              - "認証失敗時のリダイレクト先が /login"
+              - "適切なエラーメッセージが表示される"
+              - "セッションにエラー情報が格納される"
+
+      - component: "TodoController"
+        reason: "complexity_score: 0.8"
+        coverage_required: 90%
+        test_cases:
+          - name: "タグ付きTodoの作成"
+            observed_behavior: "recorded_behaviors.yaml#TodoController.タグ付きTodoの作成"
+            assertions:
+              - "Todoレコードが作成される"
+              - "todo_tagテーブルに関連レコードが作成される"
+              - "トランザクションの一貫性が保たれる"
+          
+          - name: "他ユーザーのTodoアクセス制御"
+            observed_behavior: "recorded_behaviors.yaml#TodoController.他ユーザーのTodoへのアクセス試行"
+            assertions:
+              - "他ユーザーのTodoが表示されない"
+              - "適切なアクセス制御が機能している"
+
+    medium:
+      - component: "TagController"
+        reason: "complexity_score: 0.7"
+        coverage_required: 85%
+        test_cases:
+          - name: "タグの削除処理"
+            observed_behavior: "recorded_behaviors.yaml#TagController.タグの削除試行"
+            assertions:
+              - "タグの削除が正常に完了する"
+              - "関連するTodoのタグ関連が適切に処理される"
+          
+          - name: "タグの更新と整合性"
+            observed_behavior: "recorded_behaviors.yaml#Model Dependencies.タグ更新時の整合性"
+            assertions:
+              - "タグ名の更新が反映される"
+              - "関連するTodoのタグ表示が更新される"
+
+  # テストデータ準備方針
+  data_requirements:
+    factories:
+      - name: "UserFactory"
+        fields:
+          - name: "email"
+            type: "string"
+            faker: "unique().safeEmail"
+          - name: "password"
+            type: "string"
+            faker: "password"
+
+      - name: "TodoFactory"
+        fields:
+          - name: "title"
+            type: "string"
+            faker: "sentence"
+          - name: "description"
+            type: "text"
+            faker: "paragraph"
+          - name: "user_id"
+            type: "foreignId"
+            relation: "User"
+
+      - name: "TagFactory"
+        fields:
+          - name: "name"
+            type: "string"
+            faker: "word"
+          - name: "user_id"
+            type: "foreignId"
+            relation: "User"
+
+    seeders:
+      - name: "TestDatabaseSeeder"
+        data:
+          users:
+            - role: "owner"
+              todos: 3
+              tags: 2
+            - role: "other"
+              todos: 2
+              tags: 1
+
+  # テスト実装方針
+  implementation_strategy:
+    test_structure:
+      unit_tests:
+        - "App\\Tests\\Unit\\Auth\\AuthenticationTest"
+        - "App\\Tests\\Unit\\Todo\\TodoManagementTest"
+        - "App\\Tests\\Unit\\Tag\\TagOperationsTest"
+      
+      feature_tests:
+        - "App\\Tests\\Feature\\Auth\\AuthenticationFlowTest"
+        - "App\\Tests\\Feature\\Todo\\TodoLifecycleTest"
+        - "App\\Tests\\Feature\\Tag\\TagManagementTest"
+      
+      integration_tests:
+        - "App\\Tests\\Integration\\TodoTagRelationTest"
+        - "App\\Tests\\Integration\\UserDataIntegrityTest"
+
+    assertions_focus:
+      security:
+        - "認証状態の検証"
+        - "認可チェックの確認"
+        - "クロスユーザーアクセスの制御"
+      
+      data_integrity:
+        - "トランザクションの一貫性"
+        - "関連データの整合性"
+        - "外部キー制約の遵守"
+      
+      performance:
+        - "レスポンスタイムのSLA遵守"
+        - "N+1問題の防止"
+        - "クエリ最適化の確認"
+
+    error_handling:
+      validation:
+        - "入力値の検証"
+        - "ビジネスルールの検証"
+      
+      exceptions:
+        - "認証エラー"
+        - "認可エラー"
+        - "データ整合性エラー" 
