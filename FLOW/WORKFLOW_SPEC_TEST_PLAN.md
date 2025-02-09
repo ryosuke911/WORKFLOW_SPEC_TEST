@@ -22,16 +22,20 @@ graph TD
     Phase2 --> Review2[人間レビュー: 記録内容の確認]:::review
     Review2 --> Phase3[再現方法設計]:::process
     Phase3 --> Review3[人間レビュー: テストケース設計]:::review
+    Review3 --> TD[test_design.yaml]:::file
+    Review3 --> RB[recorded_behaviors.yaml]:::file
+    
+    TD --> Phase4[最終出力生成]:::process
+    RB --> Phase4
+    Input --> Phase4
     
     Error[エラーハンドリング]:::error
     Phase1 --> Error
     Phase2 --> Error
     Phase3 --> Error
+    Phase4 --> Error
     
-    Review3 --> TD[test_design.yaml]:::file
-    Review3 --> RB[recorded_behaviors.yaml]:::file
-    TD --> IP[spec_test_implementation_plan.yaml]:::file
-    RB --> IP
+    Phase4 --> IP[spec_test_implementation_plan.yaml]:::output
 ```
 
 ## フェーズ間の依存関係
@@ -58,8 +62,11 @@ graph TD
     Phase3 --> TestDesign
     TestDesign --> TD
     Phase3 --> RB
-    TD --> IP
-    RB --> IP
+    
+    Input --> Phase4[最終出力生成]:::phase
+    TD --> Phase4
+    RB --> Phase4
+    Phase4 --> IP
 ```
 
 ## 1. 観察対象特定フェーズ
@@ -422,12 +429,7 @@ implementation_plan:
 - 依存関係の分離戦略は適切か
 - テスト環境の制約は考慮されているか
 
-### リソース見積もり（Review4）
-- 工数見積もりは現実的か
-- 必要なツールや環境は適切か
-- 優先順位付けは依存性分析の結果と整合しているか
-
-### 最終計画確認（Review5）
+### 最終計画確認（Review4）
 - 全体的な整合性は取れているか
 - 実装可能な形式になっているか
 - 依存性分析の結果が適切に活用されているか 
