@@ -4,7 +4,7 @@
 ```mermaid
 graph TD
     P1[依存関係分析]
-    P2[仕様化テスト計画]
+    P2[動作記録]
     P3[仕様化テスト実装]
     P4[仕様化テスト実行]
 
@@ -27,51 +27,60 @@ graph TD
 ### 出力
 - 依存関係分析結果（`FLOW/output/dependency_analysis.yaml`）
 
-## 2. 仕様化テスト計画フェーズ
-**実行ワークフロー**: `WORKFLOW_SPEC_TEST_PLAN.md`
+## 2. 動作記録フェーズ
+**実行ワークフロー**: `WORKFLOW_SPEC_TEST_RECORFING.md`（観点情報補完から動作記録まで）
 
 ### 目的
 - 既存コードの動作観察計画の立案
 - 動作記録の実施
-- テスト実装計画の策定
+- 実際の動作の記録
 
 ### 入力
 - 依存関係分析結果（`FLOW/output/dependency_analysis.yaml`）
 
 ### 出力
 - 動作記録（`FLOW/output/recorded_behaviors.yaml`）
-- テスト実装計画（`FLOW/output/spec_test_implementation_plan.yaml`）
 
 ## 3. 仕様化テスト実装フェーズ
 **実行ワークフロー**: `WORKFLOW_SPEC_TEST_IMPL.md`
 
 ### 目的
-実装計画と動作記録に基づいて、仕様化テストコードを実装します。
+- テスト実装計画の策定
+- テストコードの実装
+- 実装レポートの生成
 
 ### 入力
 - 動作記録（`FLOW/output/recorded_behaviors.yaml`）
-- テスト実装計画（`FLOW/output/spec_test_implementation_plan.yaml`）
+- 依存関係分析（`FLOW/output/dependency_analysis.yaml`）
 
 ### 処理内容
-1. テスト構造の決定
-   - 実装計画の `implementation_strategy.test_structure` に基づくテストクラスの配置
+1. テスト実装計画の策定
+   - 動作記録の分析と実装範囲の特定
+   - テストケースの優先順位付け
+   - 必要なモックやスタブの特定
+   - テストデータ要件の定義
+
+2. テスト構造の決定
+   - 実装計画に基づくテストクラスの配置
    - 優先順位の反映
+   - 依存関係分析を参照した実装コンテキストの把握
 
-2. テストケースの実装
-   - 実装計画の `priorities.*.test_cases` に基づくテストメソッドの生成
-   - 動作記録の参照と反映
+3. テストケースの実装
+   - 動作記録に基づく初期状態の設定
+   - 観察された処理フローの再現
+   - 状態変化を含む期待動作の検証
 
-3. テストコードの生成
-   - 正常系、エラーケース、境界値ケースの実装
-   - テストメソッドの命名規則の適用
-   - コメントとアサーションの整備
+4. テストコードの生成
+   - 実装が持つ現在の動作の忠実な再現
+   - 動作記録との整合性確保
+   - 実装コンテキストの保持
 
 ### 出力
 - テストコード（`tests/Feature/**/*Test.php`）
 - 実装レポート（`FLOW/output/test_implementation_report.yaml`）
-  - 実装の網羅性
-  - テストケースの追跡可能性
-  - コード品質の検証結果
+  - 実装の追跡可能性
+  - 動作記録との整合性
+  - 実装コンテキストの保持状況
   - 実装の進捗状況
 
 ## 4. 仕様化テスト実行フェーズ
@@ -115,16 +124,14 @@ graph TD
 ```mermaid
 graph TD
     DY[dependency.yaml] --> DA[dependency_analysis.yaml]
-    DA --> OD[observation_design.yaml]
-    DA --> IP[spec_test_implementation_plan.yaml]
-    OD --> RB[recorded_behaviors.yaml]
-    RB --> IP
-    IP --> TC[Test Code]
+    DA --> RB[recorded_behaviors.yaml]
+    DA --> TC[Test Code]
+    RB --> TC
     TC --> TR[test_results.yaml]
 ```
 
 ## 注意事項
 1. 各フェーズは独立したワークフローファイルで管理
 2. フェーズ間の入出力ファイルは厳密に定義
-3. 評価フェーズでNGの場合は計画フェーズに戻る
+3. 評価フェーズでNGの場合は必要なフェーズに戻る
 4. 全フェーズでレビューポイントを設定 

@@ -62,39 +62,57 @@ graph TD
    - テスト実行結果の構造化（`test_results.yaml`）
      ```yaml
      test_execution:
-       timestamp: "2024-03-20T10:30:00Z"
+       # テスト実行の基本情報
+       timestamp: "2024-03-20T10:30:00Z"  # 実行日時
        summary:
-         total_tests: 15
-         passed: 14
-         failed: 1
-         skipped: 0
+         total_tests: 15      # 実行されたテストの総数
+         passed: 14          # 成功したテスト数
+         failed: 1           # 失敗したテスト数
+         skipped: 0         # スキップされたテスト数
        
+       # 個々のテストケースの実行結果
        test_cases:
          - name: "test_successful_login_maintains_recorded_behavior"
-           status: "passed"
-           duration: "0.123s"
-           assertions: 3
+           status: "passed"  # テストの実行結果
+           duration: "0.123s"  # 実行時間
+           assertions: 3      # 実行された検証の数
            
          - name: "test_invalid_login_maintains_recorded_behavior"
            status: "failed"
            duration: "0.089s"
            assertions: 3
            error:
-             message: "Failed asserting response status..."
-             trace: [...]
+             message: "Failed asserting response status..."  # エラーメッセージ
+             trace: [...]  # エラーのスタックトレース
        
+       # 実装レポートとの整合性検証
        implementation_verification:
-         matching_rate: 93.3%  # 実装レポートとの一致率
-         missing_tests: []
-         unexpected_tests: []
-         naming_violations: []
+         matching_rate: 93.3%  # 実装レポートで定義されたテストとの一致率
+         missing_tests: []     # 実装レポートにあるが実行されなかったテスト
+         unexpected_tests: []  # 実装レポートにないが実行されたテスト
+         naming_violations: [] # 命名規則違反のテスト
      ```
-   - カバレッジ情報の集計（`coverage_report.html`）
-     - 行カバレッジ
-     - 分岐カバレッジ
-     - 関数カバレッジ
-     - 未カバー箇所のハイライト
+
+   このレポートは以下の情報を追跡します：
+
+   1. **実行の基本情報**
+      - 実行日時：テストが実行された時点
+      - 実行結果の要約：成功、失敗、スキップの数
+
+   2. **テストケースの詳細**
+      - テスト名：動作記録との対応を示す命名
+      - 実行状態：成功/失敗/スキップ
+      - 実行時間：パフォーマンスの参考指標
+      - 検証数：実行された検証の数
+      - エラー情報：失敗時の詳細な情報
+
+   3. **実装との整合性**
+      - 一致率：実装レポートとの対応度
+      - 漏れ：未実行のテスト
+      - 想定外：計画外のテスト
+      - 規則違反：命名規則に従っていないテスト
+
+このレポート形式により、テストの実行結果と実装の整合性を具体的な指標とともに追跡することができます。
 
 ## 出力
 - テスト実行結果（`FLOW/output/test_results.yaml`）
-- カバレッジレポート（`FLOW/output/coverage_report.html`） 
