@@ -1,0 +1,127 @@
+# テスト観点となる振る舞いのポイントを構造化
+behavior_points:
+  # 認証フロー：ユーザー登録
+  AuthController.register:
+    inputs:
+      request:
+        required_fields:
+          - name: string|max:255
+          - email: string|email|max:255
+          - password: string|min:8|confirmed
+    state_changes:
+      database:
+        - table: users
+          operation: insert
+        - table: sessions
+          operation: insert
+    outputs:
+      success:
+        type: RedirectResponse
+        destination: todos.index
+      errors:
+        - condition: "validation_failed"
+          type: ValidationException
+          fields: [name, email, password]
+
+  # タスク一覧表示：フィルタリングとページネーション
+  TodoController.index:
+    inputs:
+      request:
+        optional_fields:
+          - filter: string|in:not_completed,all,status
+          - search: string
+          - deadline: date
+          - tag_id: integer
+    state_changes: []
+    outputs:
+      success:
+        type: View
+        data:
+          todos:
+            type: LengthAwarePaginator
+            per_page: 10
+            sort:
+              - [deadline, asc]
+              - [created_at, desc]
+          tags: Collection
+      errors:
+        - condition: "unauthorized"
+          type: AuthenticationException
+
+  # タスクステータス更新：楽観的ロック制御
+  TodoController.updateStatus:
+    inputs:
+      request:
+        required_fields:
+          - status: string|in:pending,in_progress,completed
+          - last_updated: datetime
+      route_parameters:
+        - todo: Todo
+    state_changes:
+      database:
+        - table: todos
+          operation: update
+          fields: [status, updated_at]
+          version_check: true
+    outputs:
+      success:
+        type: JsonResponse
+        data: updated_todo
+      errors:
+        - condition: "unauthorized"
+          type: AuthenticationException
+        - condition: "forbidden"
+          type: AuthorizationException
+        - condition: "version_mismatch"
+          type: ConflictException
+          status: 409
+
+  # タグ作成：ユーザーごとの一意制約
+  TagController.store:
+    inputs:
+      request:
+        required_fields:
+          - name: string|max:255|unique
+    state_changes:
+      database:
+        - table: tags
+          operation: insert
+    outputs:
+      success:
+        type: RedirectResponse
+        destination: configurable
+      errors:
+        - condition: "unauthorized"
+          type: AuthenticationException
+        - condition: "validation_failed"
+          type: ValidationException
+          fields: [name]
+
+  # ダッシュボード：統計情報の集計
+  DashboardController.index:
+    inputs: []
+    state_changes: []
+    outputs:
+      success:
+        type: View
+        data:
+          statistics:
+            type: array
+            fields: [total, in_progress, completed, overdue]
+          progressChart:
+            type: array
+            fields: [labels, data, backgroundColor]
+          tagStatistics:
+            type: array
+            fields: [name, count]
+          upcomingDeadlines:
+            type: Collection
+            model: Todo
+            limit: 5
+          dailyTaskCreation:
+            type: array
+            fields: [labels, data]
+            period: last_14_days
+      errors:
+        - condition: "unauthorized"
+          type: AuthenticationException 

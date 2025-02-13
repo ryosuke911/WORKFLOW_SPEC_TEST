@@ -1,0 +1,132 @@
+code_analysis:
+  auth_flow:
+    AuthController:
+      register:
+        signature:
+          parameters:
+            - name: request
+              type: Request
+          return: RedirectResponse
+        validation:
+          name: required|string|max:255
+          email: required|string|email|max:255|unique:users
+          password: required|string|min:8|confirmed
+        flow:
+          - service: AuthService.register
+          - auth: login
+          - redirect: todos.index
+
+    AuthService:
+      register:
+        signature:
+          parameters:
+            - name: data
+              type: array
+          return: User
+        flow:
+          - create_user:
+              fields: [name, email, password]
+              password_hash: true
+
+  todo_flow:
+    TodoController:
+      index:
+        signature:
+          parameters:
+            - name: request
+              type: Request
+          return: View
+        flow:
+          - auth: required
+          - filters:
+              filter: not_completed|all|status
+              search: optional
+              deadline: optional
+              tag_id: optional
+          - service: TodoService.getTodos
+          - view: todos.index
+
+      updateStatus:
+        signature:
+          parameters:
+            - name: request
+              type: Request
+            - name: todo
+              type: Todo
+          return: JsonResponse
+        flow:
+          - auth: required
+          - policy: TodoPolicy.update
+          - validation:
+              status: required|in:pending,in_progress,completed
+              last_updated: required|date_format:Y-m-d\TH:i:s.u\Z
+          - version_check: updated_at
+          - transaction: true
+          - update: status
+          - response: json
+
+    TodoService:
+      getTodos:
+        signature:
+          parameters:
+            - name: filters
+              type: array
+          return: LengthAwarePaginator
+        flow:
+          - query_build:
+              base: user_id condition
+              with: tags
+              filters:
+                - status filter
+                - tag filter
+                - search filter
+                - deadline filter
+          - sort:
+              - [deadline, asc]
+              - [created_at, desc]
+          - paginate: 10
+
+  tag_flow:
+    TagController:
+      store:
+        signature:
+          parameters:
+            - name: request
+              type: Request
+          return: RedirectResponse
+        flow:
+          - auth: required
+          - validation:
+              name: required|string|max:255|unique:tags
+          - create:
+              model: Tag
+              fields: [name, user_id]
+          - redirect: configurable
+
+    TagPolicy:
+      update:
+        signature:
+          parameters:
+            - name: user
+              type: User
+            - name: tag
+              type: Tag
+          return: bool
+        flow:
+          - check: user_id === tag.user_id
+
+  dashboard_flow:
+    DashboardController:
+      index:
+        signature:
+          parameters: []
+          return: View
+        flow:
+          - auth: required
+          - service_calls:
+              - DashboardService.getTaskStatistics
+              - DashboardService.getProgressChartData
+              - DashboardService.getTagStatistics
+              - DashboardService.getUpcomingDeadlines
+              - DashboardService.getDailyTaskCreationData
+          - view: dashboard.index
