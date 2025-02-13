@@ -32,6 +32,41 @@ graph TD
 
 ## 1. 実装計画策定フェーズ
 
+### フェーズの流れ
+```mermaid
+sequenceDiagram
+    participant AI as Cursor Agent
+    participant RB as recorded_behaviors.yaml
+    participant SC as Source
+    participant Plan as spec_test_implementation_plan.yaml
+
+    Note over AI: フェーズ開始
+
+    rect rgba(65, 105, 225, 0.2)
+        Note over AI: 1. 動作記録分析
+        AI->>RB: 動作記録の読み込み
+        RB-->>AI: 動作パターン
+        Note over AI: パターン分類
+    end
+
+    rect rgba(60, 179, 113, 0.2)
+        Note over AI: 2. コード解析
+        AI->>SC: コード構造の確認
+        SC-->>AI: 実装詳細
+        Note over AI: 要件整理
+    end
+
+    rect rgba(218, 112, 214, 0.2)
+        Note over AI: 3. 計画策定
+        AI->>Plan: 計画の出力
+        Plan-->>AI: 出力確認
+        AI->>RB: 整合性確認
+        RB-->>AI: 確認完了
+    end
+
+    Note over AI: フェーズ完了
+```
+
 ### 概要
 recorded_behaviors.yamlとcode_analysis.yamlから、テスト実装の計画を策定します。
 
@@ -40,41 +75,92 @@ recorded_behaviors.yamlとcode_analysis.yamlから、テスト実装の計画を
 - ソースコード
 - code_analysis.yaml（実装コードの解析結果）
 
-### 処理内容
-1. **実装対象の特定と優先順位付け**
-   - recorded_behaviors.yamlから実装対象となる動作を特定
-   - 以下の観点で優先順位を評価：
-     - テストケースの依存関係
-     - データ準備の要件
-     - 実装の複雑さ
 
-2. **実装順序の決定**
-   - code_analysis.yamlを参照し、実装の技術的な制約を確認
-   - テストの実行順序を決定
+### 1. 動作記録の分析
+1. recorded_behaviors.yamlの読み込みと解析
+   - 各コントローラーの動作を整理
+   - 入力値と期待される結果を抽出
+   - データベース変更の記録を確認
 
-### 出力
-```yaml
-# spec_test_implementation_plan.yaml
-implementation_plan:
-  targets:
-    - id: "todo_creation"
-      priority: 1
-      source_file: "app/Http/Controllers/TodoController.php"
-      recorded_behavior: "scenarios.todo_basic_flow"
-      required_data:
-        - "test_user"
-        - "todo_tags"
-      implementation_notes: "基本的なTodo作成フローの検証"
+2. 動作パターンの分類
+   - 正常系と異常系の識別
+   - 依存関係の特定
+   - 優先順位の決定
 
-    - id: "todo_with_tags"
-      priority: 2
-      source_file: "app/Http/Controllers/TodoController.php"
-      recorded_behavior: "scenarios.todo_with_tags"
-      required_data:
-        - "test_user"
-        - "todo_tags"
-      implementation_notes: "タグ付きTodo作成の検証"
-```
+### 2. 技術要件の確認
+1. code_analysis.yamlの解析
+   - 実装の技術的制約を確認
+   - 必要なコンポーネントを特定
+   - インターフェースの要件を把握
+
+2. セキュリティ要件の確認
+   - 認証・認可の要件
+   - バージョン管理の仕様
+   - データ検証ルール
+
+### 3. 実装計画の策定
+1. 出力ファイルの作成
+   ```bash
+   # 出力先の確認
+   target_file="/FLOW/output/output/spec_test_implementation_plan.yaml"
+   ```
+
+2. 計画の構造
+   ```yaml
+   targets:
+     - id: string           # 機能ID
+       priority: number     # 優先順位
+       source_file: string  # 実装対象ファイル
+       test_cases:
+         - name: string     # テストケース名
+           type: string     # テストタイプ
+           priority: string # 優先度
+           dependencies: [] # 依存関係
+           expected_behavior:
+             input: {}      # 入力値
+             result: {}     # 期待される結果
+   ```
+
+3. 検証項目
+   - [ ] recorded_behaviors.yamlの全動作が網羅されているか
+   - [ ] 依存関係が正しく設定されているか
+   - [ ] 優先順位が適切か
+   - [ ] セキュリティ要件が満たされているか
+
+### 4. 品質チェック
+1. 形式検証
+   - YAMLの文法チェック
+   - 必須フィールドの存在確認
+   - 参照整合性の確認
+
+2. 内容検証
+   - recorded_behaviorsとの整合性確認
+   - テストケースの網羅性確認
+   - 依存関係の循環参照チェック
+
+## 成果物
+- /FLOW/output/output/spec_test_implementation_plan.yaml
+
+## 完了条件
+1. spec_test_implementation_plan.yamlが正しい場所に生成されていること
+2. recorded_behaviors.yamlの全動作が計画に反映されていること
+3. 全てのテストケースに具体的な期待動作が記述されていること
+4. セキュリティと性能の要件が明示されていること
+
+## エラー処理
+1. 出力ディレクトリが存在しない場合
+   - ディレクトリを作成
+   - 作成できない場合はエラーを報告
+
+2. 整合性エラーの検出時
+   - エラー内容を報告
+   - 修正案を提示
+
+## 注意事項
+- 出力ファイルは必ず指定されたディレクトリに配置すること
+- 動作記録との整合性を最優先すること
+- セキュリティ要件を明示的に記述すること
+- パフォーマンス最適化の方針を含めること
 
 ## 2. テスト実装ループフェーズ
 
