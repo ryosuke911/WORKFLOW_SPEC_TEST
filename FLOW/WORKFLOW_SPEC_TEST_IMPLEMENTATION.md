@@ -83,168 +83,238 @@ implementation_plan:
 以下のループを、すべてのテストケースが実装完了するまで繰り返します。
 
 ```mermaid
-graph TD
+graph TB
     %% スタイル定義
     classDef process fill:#424242,stroke:#90caf9,color:#fff
     classDef decision fill:#ff5722,stroke:#ffccbc,color:#fff
+    classDef input fill:#0277bd,stroke:#b3e5fc,color:#fff
     
+    %% メインフロー
     Start[次のテストケース選択] --> P1[1.動作記録の解析]:::process
     P1 --> P2[2.実装コードの詳細理解]:::process
     P2 --> P3[3.テストコード実装]:::process
     P3 --> P4[4.テスト実行と検証]:::process
-    P4 --> Decision{全テストケース完了?}:::decision
+    P4 --> Decision{全テストケース<br>完了?}:::decision
     Decision -->|No| Start
     Decision -->|Yes| End[実装完了]
+
+    %% 入力ファイルの関連付け（左側に配置）
+    RecordedBehaviors[recorded_behaviors.yaml]:::input --> |参照| P1
+    SourceCode[実装コード]:::input --> |参照| P2
+
+    %% レイアウト調整
+    subgraph inputs [入力ファイル]
+        RecordedBehaviors
+        SourceCode
+    end
+
+    %% 位置調整
+    subgraph main [メインフロー]
+        direction TB
+        Start
+        P1
+        P2
+        P3
+        P4
+        Decision
+        End
+    end
+
+    %% スタイル設定
+    style inputs fill:none,stroke:none
+    style main fill:none,stroke:none
 ```
 
-### ループの各ステップ
+### ループの各ステップ詳細
 
 1. **次のテストケース選択**
    - spec_test_implementation_plan.yamlから未実装のテストケースを優先順位に従って選択
    ```yaml
    # 例：次に実装するテストケースの選択
    current_target:
-     id: "todo_creation"
-     priority: 1
-     source_file: "app/Http/Controllers/TodoController.php"
-     recorded_behavior: "scenarios.todo_basic_flow"
+     id: "todo_policy_update"
+     priority: 3
+     source_file: "app/Policies/TodoPolicy.php"
+     required_data:
+       - "test_user"
+       - "sample_todo"
+     dependencies:
+       - "todo_service_get_todos"
+     implementation_notes: "タスク更新ポリシーの検証"
    ```
 
 2. **動作記録の解析**
-   - recorded_behaviors.yamlから対象テストケースの詳細を抽出
-   - 入力データ、期待される出力、状態変化を特定
+
+   a. **動作記録の特定**
+      - recorded_behaviors.yamlから対象テストケースの動作記録を抽出
+      - 動作記録の構造を理解
+      ```yaml
+      # 例：TodoController.updateの動作記録
+      TodoController.update:
+        test_cases:
+          basic:
+            description: "基本的なタスク更新の動作を記録"
+            execution:
+              steps:
+                - action: "タスク更新"
+                  path: "/todos/3"
+                  method: "PUT"
+                  input:
+                    title: "更新後のタスク"
+                    description: "これは更新後のタスクです"
+      ```
+
+   b. **テストポイントの抽出**
+      - 入力データの特定
+      - 期待される出力の特定
+      - 状態変化の特定
+      - エッジケースの特定
 
 3. **実装コードの詳細理解**
-   a. **メソッドの構造解析**
-      - シグネチャ（引数、戻り値の型）の確認
-      - バリデーションルールの把握
-      - 内部で使用される定数や設定値の特定
-   
-   b. **処理フローの把握**
-      - 前処理（認証、認可）の確認
-      - 主要な処理ステップの特定
-      - データベーストランザクションの範囲
-      - エラーハンドリングのパターン
-   
-   c. **依存関係の確認**
-      - 利用している他のクラスやメソッド
-      - データベースのテーブル構造とリレーション
-      - 外部サービスとの連携ポイント
-   
-   d. **副作用の特定**
-      - データベースの状態変化
-      - ファイル操作
-      - キャッシュの更新
-      - イベント発火
-   
-   ```php
-   // 実装コードの例（解析対象）
-   public function store(TodoRequest $request)
-   {
-       // 認可チェック
-       $this->authorize('create', Todo::class);
-       
-       // トランザクション開始
-       DB::beginTransaction();
-       try {
-           // Todoの作成
-           $todo = Todo::create([
-               'title' => $request->title,
-               'description' => $request->description,
-               'user_id' => auth()->id()
-           ]);
-           
-           // タグの関連付け
-           if ($request->has('tags')) {
-               $todo->tags()->attach($request->tags);
-           }
-           
-           // イベント発火
-           event(new TodoCreated($todo));
-           
-           DB::commit();
-           return response()->json($todo, 201);
-       } catch (\Exception $e) {
-           DB::rollback();
-           throw $e;
-       }
-   }
-   ```
+
+   a. **関連ファイルの特定**
+      - 主要な実装ファイル
+      - 関連するモデル
+      - 依存するサービス
+      - ポリシーやバリデーション
+
+   b. **コードの構造解析**
+      - メソッドのシグネチャ
+      - 処理フロー
+      - データの流れ
+      - エラーハンドリング
+      ```php
+      // 例：TodoPolicyの実装
+      public function update(User $user, Todo $todo)
+      {
+          return $user->id === $todo->user_id;
+      }
+      ```
+
+   c. **テスト要件の整理**
+      - 必要なテストデータ
+      - テストケースの分類
+      - 検証ポイント
 
 4. **テストコード実装**
-   ```php
-   /**
-    * Todo作成機能の仕様化テスト
-    * 参照動作記録: recorded_behaviors.yaml > scenarios.todo_basic_flow
-    *
-    * 実装の注意点:
-    * - TodoRequestによるバリデーション
-    * - create権限のチェック
-    * - トランザクション内での処理
-    * - タグ関連付けの有無
-    * - TodoCreatedイベントの発火
-    */
-   class TodoCreationTest extends TestCase
-   {
-       protected function setUp(): void
-       {
-           parent::setUp();
-           // 記録された初期状態を再現
-           $this->seed(TestDataSeeder::class);
-           
-           // イベントリスナーの準備（副作用の検証用）
-           Event::fake([TodoCreated::class]);
-       }
 
-       public function test_create_todo_with_basic_flow()
-       {
-           // 1. 記録された入力データを使用
-           $input = [
-               'title' => 'テストTodo',
-               'description' => 'これはテストです',
-               'tags' => [1, 2]  // 記録された関連タグ
-           ];
+   a. **テストクラスの構造化**
+      - Unit層とFeature層の適切な分離
+      - テストデータのセットアップ
+      ```php
+      class TodoPolicyTest extends TestCase
+      {
+          use RefreshDatabase;
 
-           // 2. 記録された操作を再現
-           $response = $this->actingAs($this->testUser)
-                          ->post('/api/todos', $input);
+          private TodoPolicy $policy;
+          private User $user;
+          private Todo $todo;
 
-           // 3. 記録された結果と一致することを検証
-           $response->assertStatus(201);
-           
-           // データベースの状態変化を検証
-           $this->assertDatabaseHas('todos', [
-               'title' => 'テストTodo',
-               'user_id' => $this->testUser->id
-           ]);
-           
-           // タグの関連付けを検証
-           $todo = Todo::latest()->first();
-           $this->assertEquals([1, 2], $todo->tags->pluck('id')->toArray());
-           
-           // イベント発火を検証
-           Event::assertDispatched(TodoCreated::class);
-       }
-   }
-   ```
+          protected function setUp(): void
+          {
+              parent::setUp();
+              // テストの準備
+          }
+      }
+      ```
+
+   b. **テストケースの実装**
+      - 動作記録に基づくテストケース
+      - エッジケースのテスト
+      - バリデーションのテスト
+      ```php
+      /**
+       * @test
+       * @group todo_policy_update
+       */
+      public function update_allows_todo_owner()
+      {
+          $result = $this->policy->update($this->user, $this->todo);
+          $this->assertTrue($result);
+      }
+      ```
+
+   c. **アサーションの実装**
+      - データベースの状態検証
+      - レスポンスの検証
+      - 副作用の検証
+      ```php
+      // データベースの検証
+      $this->assertDatabaseHas('todos', [
+          'id' => $this->todo->id,
+          'title' => '更新後のタスク'
+      ]);
+
+      // レスポンスの検証
+      $response->assertStatus(302);
+      $response->assertRedirect('/todos');
+      ```
 
 5. **テスト実行と検証**
-   - 実装したテストコードを実行
-   - 動作記録との一致を確認
-   - 実装状況を更新
-   ```yaml
-   # implementation_status.yaml
-   status:
-     completed:
-       - id: "todo_creation"
-         test_file: "tests/Feature/TodoCreationTest.php"
-         status: "completed"
-     pending:
-       - id: "todo_with_tags"
-         priority: 2
-       - id: "todo_deletion"
-         priority: 3
+
+   a. **テストの実行**
+      ```bash
+      php artisan test --group todo_policy_update
+      ```
+
+   b. **結果の検証**
+      - すべてのテストが成功することを確認
+      - カバレッジの確認
+      - エッジケースの網羅確認
+
+   c. **実装状況の更新**
+      ```yaml
+      # implementation_status.yaml
+      status:
+        completed:
+          - id: "todo_policy_update"
+            test_files:
+              - "tests/Unit/Policies/TodoPolicyTest.php"
+              - "tests/Feature/Todo/TodoUpdatePolicyTest.php"
+            status: "completed"
+            completed_at: "2024-02-15 14:30:00"
+      ```
+
+### テスト実装のベストプラクティス
+
+1. **動作記録の忠実な再現**
+   - recorded_behaviors.yamlの記録を正確に再現
+   - テストデータは動作記録に基づいて作成
+   - 検証項目は動作記録から漏れなく抽出
+
+2. **テストの階層化**
+   - Unit層：個別のコンポーネントのテスト
+     - サービスクラスの機能テスト
+     - ポリシーの認可ロジックテスト
+     - バリデーションルールのテスト
+
+   - Feature層：統合的な機能テスト
+     - HTTPリクエスト/レスポンスのテスト
+     - データベーストランザクションのテスト
+     - 認証/認可の統合テスト
+
+3. **テストデータの管理**
+   - Factory/Seederの適切な使用
+   - テストケース間のデータ独立性確保
+   - 現実的なテストデータの作成
+
+4. **テストの可読性**
+   - 明確なテストケース名
+   - テストの意図を示すコメント
+   - グループタグによる分類
+   ```php
+   /**
+    * @test
+    * @group todo_policy_update
+    * @description タスクの所有者が更新できることを確認
+    */
    ```
+
+5. **エラーケースの網羅**
+   - バリデーションエラー
+   - 認可エラー
+   - 不正なデータ
+   - エッジケース
 
 ### ループの終了条件
 - spec_test_implementation_plan.yamlに定義されたすべてのテストケースが実装完了
